@@ -7,12 +7,13 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/lumacielz/star-wars-api/web"
+	"github.com/lumacielz/star-wars-api/web/platform"
 )
 
 func main() {
-	ctrl := web.NewController()
+	repo := platform.NewSWPeopleRepository()
+	ctrl := web.NewController(repo)
 	r := mux.NewRouter()
-	r.Methods(http.MethodGet).Path("/ping").HandlerFunc(ctrl.HandlePing)
 	r.Methods(http.MethodPost).Path("/person").HandlerFunc(ctrl.HandleCreatePerson)
 	r.Methods(http.MethodGet).Path("/person").HandlerFunc(ctrl.HandleListPeople)
 	r.Methods(http.MethodGet).Path("/person/{id}").HandlerFunc(ctrl.HandleGetPersonById)
