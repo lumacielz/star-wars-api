@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -46,6 +47,7 @@ func (c *Controller) HandleCreatePerson(w http.ResponseWriter, r *http.Request) 
 		io.WriteString(w, err.Error())
 		return
 	}
+	defer r.Body.Close()
 	id := c.nextId
 	p.Id = id
 	c.store[id] = p
@@ -70,27 +72,79 @@ func (c *Controller) HandleListPeople(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Controller) HandleGetPersonById(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	personIdRaw := vars["id"]
-	strconv.ParseUint(personIdRaw, 10, 32)
-	personId, err := strconv.Atoi(personIdRaw)
+	id, err := c.parsePersonId(r)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		return
 	}
 
-	id := uint(personId)
 	p, found := c.store[id]
 	if !found {
 		w.WriteHeader(http.StatusNotFound)
-		return
 	}
 
 	w.Header().Add("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode((p))
+
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+}
+
+func (c *Controller) HandleDeletePerson(w http.ResponseWriter, r *http.Request) {
+	id, err := c.parsePersonId(r)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	_, found := c.store[id]
+	if !found {
+		w.WriteHeader(http.StatusNotFound)
+	}
+	delete(c.store, id)
+	w.WriteHeader(http.StatusNoContent)
+
+}
+
+func (c *Controller) HandleUpdatePerson(w http.ResponseWriter, r *http.Request) {
+	id, err := c.parsePersonId(r)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+
+	_, found := c.store[id]
+	if !found {
+		w.WriteHeader(http.StatusNotFound)
+	}
+
+	p := Person{}
+
+	w.Header().Add("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode((&p))
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+	p.Id = id
+	c.store[id] = p
+	w.WriteHeader(http.StatusNoContent)
+
+}
+
+func (c *Controller) parsePersonId(r *http.Request) (uint, error) {
+	vars := mux.Vars(r) //map com  os path parameters
+	personIdRaw := vars["id"]
+	//strconv.ParseUint(personIdRaw, 10, 32)
+	personId, err := strconv.Atoi(personIdRaw) //converte o id para inteiro
+	if err != nil {
+		return 0, err
+	}
+	id := uint(personId)
+	if personId <= 0 {
+		return 0, errors.New("id must be positive")
+	}
+	return id, nil
 
 }
