@@ -2,67 +2,52 @@ package web
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/lumacielz/star-wars-api/domain"
 )
 
+type PeopleRepository interface {
+	Create(p domain.Person) error
+	List() domain.People
+	Get(id uint64) (domain.Person, error)
+	Update(id uint64, person domain.Person) error
+	Delete(id uint64) error
+}
 type Controller struct { //aarmazena as pessoas
-	nextId uint
-	store  map[uint]Person //dicionario que associa um id com uma pessoa
-}
-type Person struct {
-	Id        uint   `json:id`
-	Name      string `json:name`
-	Height    string `json:height`
-	Mass      string `json:mass`
-	HairColor string `json:hair-color`
-	SkinColor string `json:skin-color`
-	EyeColor  string `json:eye-color`
-	BirthYear string `json: birth-year`
-	Gender    string `json:gender`
+	repo PeopleRepository //dicionario que associa um id com uma pessoa
 }
 
-func NewController() *Controller {
-	return &Controller{
-		nextId: 1,
-		store:  make(map[uint]Person),
-	}
-
-}
-func (c *Controller) HandlePing(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "pong!")
+func NewController(r PeopleRepository) *Controller {
+	return &Controller{repo: r}
 
 }
 
 func (c *Controller) HandleCreatePerson(w http.ResponseWriter, r *http.Request) {
-
-	p := Person{}
-	err := json.NewDecoder(r.Body).Decode(&p)
+	p, err := c.parsePersonBody(r)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, err.Error())
 		return
 	}
-	defer r.Body.Close()
-	id := c.nextId
-	p.Id = id
-	c.store[id] = p
-	c.nextId++
+	err = c.repo.Create(p)
+	if err != nil {
+		log.Printf("[ERROR] failed to create person on database: %s\n", err)
 
-	w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (c *Controller) HandleListPeople(w http.ResponseWriter, r *http.Request) {
-	people := make([]Person, len(c.store))
-	i := 0
-	for _, value := range c.store {
-		people[i] = value
-		i++
-	}
+	people := c.repo.List()
 	w.Header().Add("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode((people))
 	if err != nil {
@@ -72,18 +57,23 @@ func (c *Controller) HandleListPeople(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Controller) HandleGetPersonById(w http.ResponseWriter, r *http.Request) {
-	id, err := c.parsePersonId(r)
+	personId, err := c.parsePersonId(r)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 
-	p, found := c.store[id]
-	if !found {
+	person, err := c.repo.Get(personId)
+	if err == domain.ErrNotFound {
 		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Add("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode((p))
+	err = json.NewEncoder(w).Encode((person))
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -95,56 +85,76 @@ func (c *Controller) HandleGetPersonById(w http.ResponseWriter, r *http.Request)
 func (c *Controller) HandleDeletePerson(w http.ResponseWriter, r *http.Request) {
 	id, err := c.parsePersonId(r)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-	}
-	_, found := c.store[id]
-	if !found {
-		w.WriteHeader(http.StatusNotFound)
-	}
-	delete(c.store, id)
-	w.WriteHeader(http.StatusNoContent)
+		log.Printf("[ERROR] failed to parser person id: %s\n", err)
 
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = c.repo.Delete(id)
+	if err == domain.ErrNotFound {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	return
 }
 
 func (c *Controller) HandleUpdatePerson(w http.ResponseWriter, r *http.Request) {
 	id, err := c.parsePersonId(r)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-	}
+		log.Printf("[ERROR] failed to parser person id: %s\n", err)
 
-	_, found := c.store[id]
-	if !found {
-		w.WriteHeader(http.StatusNotFound)
-	}
-
-	p := Person{}
-
-	w.Header().Add("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode((&p))
-
-	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
-	p.Id = id
-	c.store[id] = p
-	w.WriteHeader(http.StatusNoContent)
 
+	person, err := c.parsePersonBody(r)
+	if err != nil {
+		log.Printf("[ERROR] failed to read update person body: %s\n", err)
+
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = c.repo.Update(id, person)
+	if err == domain.ErrNotFound {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
-func (c *Controller) parsePersonId(r *http.Request) (uint, error) {
-	vars := mux.Vars(r) //map com  os path parameters
+func (c *Controller) parsePersonId(r *http.Request) (uint64, error) {
+	vars := mux.Vars(r)
 	personIdRaw := vars["id"]
-	//strconv.ParseUint(personIdRaw, 10, 32)
-	personId, err := strconv.Atoi(personIdRaw) //converte o id para inteiro
+	personId, err := strconv.Atoi(personIdRaw)
 	if err != nil {
 		return 0, err
 	}
-	id := uint(personId)
-	if personId <= 0 {
-		return 0, errors.New("id must be positive")
-	}
-	return id, nil
 
+	if personId <= 0 {
+		return 0, fmt.Errorf("person id should not be zero or less")
+	}
+
+	return uint64(personId), nil
+}
+func (c *Controller) parsePersonBody(r *http.Request) (domain.Person, error) {
+	var p domain.Person
+	err := json.NewDecoder(r.Body).Decode(&p)
+	if err != nil {
+		return domain.Person{}, err
+	}
+
+	return p, err
 }
