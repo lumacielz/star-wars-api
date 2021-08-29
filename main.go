@@ -6,19 +6,19 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/lumacielz/star-wars-api/database"
 	"github.com/lumacielz/star-wars-api/web"
-	"github.com/lumacielz/star-wars-api/web/platform"
 )
 
 func main() {
-	repo := platform.NewSWPeopleRepository()
-	ctrl := web.NewController(repo)
+	repos := database.SWPeopleRepository{}
+	ctrl := web.NewController(repos)
 	r := mux.NewRouter()
 	r.Methods(http.MethodPost).Path("/person").HandlerFunc(ctrl.HandleCreatePerson)
 	r.Methods(http.MethodGet).Path("/person").HandlerFunc(ctrl.HandleListPeople)
 	r.Methods(http.MethodGet).Path("/person/{id}").HandlerFunc(ctrl.HandleGetPersonById)
-	r.Methods(http.MethodDelete).Path("/person/{id}").HandlerFunc(ctrl.HandleDeletePerson)
-	r.Methods(http.MethodPut).Path("/person/{id}").HandlerFunc(ctrl.HandleUpdatePerson)
+	//r.Methods(http.MethodDelete).Path("/person/{id}").HandlerFunc(ctrl.HandleDeletePerson)
+	//r.Methods(http.MethodPut).Path("/person/{id}").HandlerFunc(ctrl.HandleUpdatePerson)
 
 	log.Println("starting server...")
 	err := http.ListenAndServe(":8080", r)
@@ -26,4 +26,5 @@ func main() {
 		log.Printf("[ERROR] %s\n", err.Error())
 		os.Exit(1)
 	}
+
 }

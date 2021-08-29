@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/lumacielz/star-wars-api/domain"
+	"github.com/lumacielz/star-wars-api/database/domain"
 )
 
 const baseUrl = "https://swapi.dev/api/people"
