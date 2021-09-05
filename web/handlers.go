@@ -74,8 +74,6 @@ func (c *Controller) HandleGetPersonById(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Add("Content-Type", "application/json")
-	//err = json.NewEncoder(w).Encode((person))
-
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

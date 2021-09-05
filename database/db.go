@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/lumacielz/star-wars-api/database/domain"
+	"github.com/lumacielz/star-wars-api/web/platform"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,7 +17,7 @@ var Collection *mongo.Collection = CreateConection()
 type SWPeopleRepository struct{}
 
 func (r SWPeopleRepository) Create(p domain.Person) error {
-
+	p.Films, _ = platform.GetPersonFilms(p)
 	res, err := Collection.InsertOne(context.Background(), p)
 	if err != nil {
 		return errors.New("não inserido")
