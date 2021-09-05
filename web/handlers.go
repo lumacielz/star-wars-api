@@ -15,11 +15,11 @@ type PeopleRepository interface {
 	Create(p domain.Person) error
 	List() ([]bson.M, error)
 	GetById(id string) ([]bson.M, error)
-	// Update(id uint64, person domain.Person) error
-	// Delete(id uint64) error
+	Update(id string, person domain.Person) error
+	Delete(id string) error
 }
-type Controller struct { //aarmazena as pessoas
-	repo PeopleRepository //dicionario que associa um id com uma pessoa
+type Controller struct {
+	repo PeopleRepository
 }
 
 func NewController(r PeopleRepository) *Controller {
@@ -85,58 +85,58 @@ func (c *Controller) HandleGetPersonById(w http.ResponseWriter, r *http.Request)
 
 }
 
-// func (c *Controller) HandleDeletePerson(w http.ResponseWriter, r *http.Request) {
-// 	id, err := c.parsePersonId(r)
-// 	if err != nil {
-// 		log.Printf("[ERROR] failed to parser person id: %s\n", err)
+func (c *Controller) HandleDeletePerson(w http.ResponseWriter, r *http.Request) {
+	id, err := c.parsePersonId(r)
+	if err != nil {
+		log.Printf("[ERROR] failed to parser person id: %s\n", err)
 
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-// 	err = c.repo.Delete(id)
-// 	if err == domain.ErrNotFound {
-// 		w.WriteHeader(http.StatusNotFound)
-// 		return
-// 	}
-// 	if err != nil {
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		return
-// 	}
+	err = c.repo.Delete(id)
+	if err == domain.ErrNotFound {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
-// 	w.WriteHeader(http.StatusNoContent)
-// 	return
-// }
+	w.WriteHeader(http.StatusNoContent)
+	return
+}
 
-// func (c *Controller) HandleUpdatePerson(w http.ResponseWriter, r *http.Request) {
-// 	id, err := c.parsePersonId(r)
-// 	if err != nil {
-// 		log.Printf("[ERROR] failed to parser person id: %s\n", err)
+func (c *Controller) HandleUpdatePerson(w http.ResponseWriter, r *http.Request) {
+	id, err := c.parsePersonId(r)
+	if err != nil {
+		log.Printf("[ERROR] failed to parser person id: %s\n", err)
 
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-// 	person, err := c.parsePersonBody(r)
-// 	if err != nil {
-// 		log.Printf("[ERROR] failed to read update person body: %s\n", err)
+	person, err := c.parsePersonBody(r)
+	if err != nil {
+		log.Printf("[ERROR] failed to read update person body: %s\n", err)
 
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-// 	err = c.repo.Update(id, person)
-// 	if err == domain.ErrNotFound {
-// 		w.WriteHeader(http.StatusNotFound)
-// 		return
-// 	}
-// 	if err != nil {
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		return
-// 	}
+	err = c.repo.Update(id, person)
+	if err == domain.ErrNotFound {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
-// 	w.WriteHeader(http.StatusNoContent)
-// }
+	w.WriteHeader(http.StatusNoContent)
+}
 
 func (c *Controller) parsePersonId(r *http.Request) (string, error) {
 	vars := mux.Vars(r)

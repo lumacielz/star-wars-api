@@ -9,7 +9,6 @@ var ErrNotFound = errors.New("person not found")
 type People []Person
 
 type Person struct {
-	//Id        primitive.ObjectID `bson:_id,omitempty`
 	Name      string `bson:name`
 	Height    string `bson:height`
 	Mass      string `bson:mass`
